@@ -1,0 +1,48 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_IMAGE:$SHORT_SHA', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_IMAGE:$SHORT_SHA']
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'deploy'
+  - '$_IMAGE-service'
+  - '--service-account'
+  - '$_SERVICE_ACCOUNT'
+  - '--add-cloudsql-instances'
+  - '$PROJECT_ID:$_REGION:$_CLOUD_SQL'
+  - '--image'
+  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_IMAGE:$SHORT_SHA'
+  - '--region'
+  - '$_REGION'
+  - '--min-instances'
+  - '0'
+  - '--max-instances'
+  - '5'
+  - '--concurrency'
+  - '500'
+  - '--platform'
+  - 'managed'
+  - '--allow-unauthenticated'
+  - '--update-secrets'
+  - 'DB_SECRET_KEY=$_DB_SECRET_KEY'
+  - '--update-secrets'
+  - 'API_SECRET_KEY=$_API_SECRET_KEY'
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'services'
+  - 'add-iam-policy-binding'
+  - '$_IMAGE-service'
+  - '--region'
+  - '$_REGION'
+  - '--member'
+  - 'serviceAccount:$_SERVICE_ACCOUNT'
+  - '--role'
+  - 'roles/run.invoker'
+
+options:
+    logging: CLOUD_LOGGING_ONLY
